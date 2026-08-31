@@ -1,0 +1,1855 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Drone Simulator - V0.5 Cidade + Áudio</title>
+
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #000;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      canvas {
+        display: block;
+      }
+
+      /* ==============================
+           HUD
+        ============================== */
+
+      #hud {
+        position: fixed;
+
+        top: 15px;
+        left: 15px;
+
+        padding: 13px 16px;
+
+        color: white;
+
+        background: rgba(0, 0, 0, 0.48);
+
+        border: 1px solid rgba(255, 255, 255, 0.15);
+
+        border-radius: 10px;
+
+        font-size: 13px;
+
+        line-height: 1.65;
+
+        z-index: 10;
+
+        pointer-events: none;
+
+        backdrop-filter: blur(5px);
+      }
+
+      #status {
+        position: fixed;
+
+        top: 15px;
+        right: 15px;
+
+        padding: 10px 16px;
+
+        color: white;
+
+        background: rgba(0, 0, 0, 0.48);
+
+        border-radius: 8px;
+
+        font-size: 14px;
+
+        z-index: 10;
+      }
+
+      #crosshair {
+        position: fixed;
+
+        left: 50%;
+        top: 50%;
+
+        width: 8px;
+        height: 8px;
+
+        margin-left: -4px;
+        margin-top: -4px;
+
+        border: 1px solid rgba(255, 255, 255, 0.8);
+
+        border-radius: 50%;
+
+        z-index: 10;
+
+        pointer-events: none;
+      }
+
+      #help {
+        position: fixed;
+
+        bottom: 15px;
+        left: 50%;
+
+        transform: translateX(-50%);
+
+        padding: 8px 14px;
+
+        color: rgba(255, 255, 255, 0.8);
+
+        background: rgba(0, 0, 0, 0.45);
+
+        border-radius: 6px;
+
+        font-size: 12px;
+
+        z-index: 10;
+      }
+
+      /* ==============================
+           CONTROLE
+        ============================== */
+
+      #controllerPanel {
+        position: fixed;
+
+        left: 15px;
+        bottom: 15px;
+
+        width: 310px;
+
+        padding: 15px;
+
+        color: white;
+
+        background: rgba(0, 0, 0, 0.7);
+
+        border-radius: 10px;
+
+        z-index: 20;
+
+        display: none;
+
+        backdrop-filter: blur(8px);
+      }
+
+      #controllerPanel h3 {
+        margin: 0 0 10px 0;
+
+        font-size: 16px;
+      }
+
+      #controllerName {
+        font-size: 12px;
+
+        color: #aaa;
+
+        margin-bottom: 10px;
+      }
+
+      .axis {
+        margin: 7px 0;
+      }
+
+      .axisLabel {
+        display: flex;
+
+        justify-content: space-between;
+
+        font-size: 11px;
+
+        margin-bottom: 3px;
+      }
+
+      .bar {
+        width: 100%;
+        height: 8px;
+
+        background: rgba(255, 255, 255, 0.12);
+
+        border-radius: 5px;
+
+        overflow: hidden;
+      }
+
+      .barFill {
+        height: 100%;
+
+        width: 50%;
+
+        background: white;
+
+        transform: translateX(-50%);
+      }
+
+      button {
+        width: 100%;
+
+        margin-top: 10px;
+
+        padding: 9px;
+
+        border: none;
+
+        border-radius: 6px;
+
+        cursor: pointer;
+
+        background: #fff;
+
+        color: #111;
+
+        font-weight: bold;
+      }
+
+      #calibration {
+        display: none;
+
+        position: fixed;
+
+        inset: 0;
+
+        z-index: 100;
+
+        background: rgba(0, 0, 0, 0.78);
+
+        align-items: center;
+
+        justify-content: center;
+
+        color: white;
+
+        text-align: center;
+      }
+
+      #calibrationBox {
+        width: 400px;
+
+        max-width: 90%;
+
+        padding: 30px;
+
+        background: #171717;
+
+        border-radius: 12px;
+      }
+
+      #calibrationTitle {
+        font-size: 21px;
+
+        margin-bottom: 15px;
+      }
+
+      #calibrationText {
+        color: #ccc;
+
+        line-height: 1.5;
+
+        min-height: 70px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="hud">
+      <b>DRONE SIMULATOR V0.5</b>
+
+      <br />
+
+      Controle:
+      <span id="gamepadStatus"> procurando... </span>
+
+      <br />
+
+      Altura:
+      <span id="altitude"> 0.00 </span>
+      m
+
+      <br />
+
+      Velocidade:
+      <span id="speed"> 0.00 </span>
+      m/s
+
+      <br />
+
+      Yaw:
+      <span id="yaw"> 0 </span>°
+
+      <br />
+
+      Gimbal:
+      <span id="gimbalAngle"> 0 </span>°
+    </div>
+
+    <div
+      id="audioStatus"
+      style="
+        position: fixed;
+        right: 15px;
+        top: 58px;
+        padding: 8px 12px;
+        color: white;
+        background: rgba(0, 0, 0, 0.42);
+        border-radius: 7px;
+        font-size: 12px;
+        z-index: 10;
+        pointer-events: none;
+      "
+    >
+      🔊 Som: clique para ativar
+    </div>
+
+    <div id="status">
+      MODE:
+      <b id="mode"> NORMAL </b>
+    </div>
+
+    <div id="crosshair"></div>
+
+    <div id="help">
+      L1/R1 = modo | Esquerdo = subir/descer + girar | Direito = frente/trás +
+      lateral | L2/R2 = gimbal
+    </div>
+
+    <!-- ==========================================
+     PAINEL DO CONTROLE
+========================================== -->
+
+    <div id="controllerPanel">
+      <h3>Controle detectado</h3>
+
+      <div id="controllerName">Nenhum controle</div>
+
+      <div class="axis">
+        <div class="axisLabel">
+          <span>Axis 0</span>
+          <span id="a0Text">0.00</span>
+        </div>
+
+        <div class="bar">
+          <div class="barFill" id="a0"></div>
+        </div>
+      </div>
+
+      <div class="axis">
+        <div class="axisLabel">
+          <span>Axis 1</span>
+          <span id="a1Text">0.00</span>
+        </div>
+
+        <div class="bar">
+          <div class="barFill" id="a1"></div>
+        </div>
+      </div>
+
+      <div class="axis">
+        <div class="axisLabel">
+          <span>Axis 2</span>
+          <span id="a2Text">0.00</span>
+        </div>
+
+        <div class="bar">
+          <div class="barFill" id="a2"></div>
+        </div>
+      </div>
+
+      <div class="axis">
+        <div class="axisLabel">
+          <span>Axis 3</span>
+          <span id="a3Text">0.00</span>
+        </div>
+
+        <div class="bar">
+          <div class="barFill" id="a3"></div>
+        </div>
+      </div>
+
+      <button id="centerButton">RECENTRALIZAR STICKS</button>
+
+      <button id="calibrateButton">CONFIGURAR CONTROLE</button>
+    </div>
+
+    <!-- ==========================================
+     CALIBRAÇÃO
+========================================== -->
+
+    <div id="calibration">
+      <div id="calibrationBox">
+        <div id="calibrationTitle">Configuração do controle</div>
+
+        <div id="calibrationText">Prepare o controle.</div>
+
+        <button id="calibrationCancel">CANCELAR</button>
+      </div>
+    </div>
+
+    <script type="module">
+      import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+
+      /* =========================================================
+   CENA
+========================================================= */
+
+      const scene = new THREE.Scene();
+
+      scene.background = new THREE.Color(0x87b8d8);
+
+      scene.fog = new THREE.Fog(0x87b8d8, 80, 350);
+
+      /* =========================================================
+   CÂMERA
+========================================================= */
+
+      const camera = new THREE.PerspectiveCamera(
+        84,
+        window.innerWidth / window.innerHeight,
+        0.05,
+        1000,
+      );
+
+      camera.position.set(0, 0.3, 30);
+
+      /* =========================================================
+   RENDERER
+========================================================= */
+
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+      });
+
+      renderer.setSize(window.innerWidth, window.innerHeight);
+
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      renderer.shadowMap.enabled = true;
+
+      document.body.appendChild(renderer.domElement);
+
+      /* =========================================================
+   ILUMINAÇÃO
+========================================================= */
+
+      const ambient = new THREE.HemisphereLight(0xffffff, 0x445566, 2);
+
+      scene.add(ambient);
+
+      const sun = new THREE.DirectionalLight(0xffffff, 3);
+
+      sun.position.set(100, 150, 50);
+
+      sun.castShadow = true;
+
+      scene.add(sun);
+
+      /* =========================================================
+   CHÃO
+========================================================= */
+
+      const groundGeometry = new THREE.PlaneGeometry(1000, 1000);
+
+      const groundMaterial = new THREE.MeshStandardMaterial({
+        color: 0x777777,
+        roughness: 1,
+      });
+
+      const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+
+      ground.rotation.x = -Math.PI / 2;
+
+      ground.receiveShadow = true;
+
+      scene.add(ground);
+
+      /* =========================================================
+   OBSTÁCULOS
+========================================================= */
+
+      const obstacles = [];
+
+      function createBuilding(x, z, width, depth, height) {
+        const geometry = new THREE.BoxGeometry(width, height, depth);
+
+        const material = new THREE.MeshStandardMaterial({
+          color: new THREE.Color().setHSL(Math.random(), 0.25, 0.45),
+        });
+
+        const building = new THREE.Mesh(geometry, material);
+
+        building.position.set(x, height / 2, z);
+
+        building.castShadow = true;
+
+        building.receiveShadow = true;
+
+        scene.add(building);
+
+        obstacles.push({
+          mesh: building,
+
+          width: width,
+
+          depth: depth,
+
+          height: height,
+        });
+      }
+
+      createBuilding(-25, -30, 15, 15, 15);
+
+      createBuilding(25, -40, 20, 15, 25);
+
+      createBuilding(45, 10, 12, 20, 10);
+
+      createBuilding(-45, 20, 20, 12, 18);
+
+      createBuilding(0, -75, 30, 15, 12);
+
+      createBuilding(-70, -70, 20, 20, 30);
+
+      createBuilding(70, -80, 25, 20, 18);
+
+      /* =========================================================
+   CIDADE - CENÁRIO V0.5
+========================================================= */
+
+      const mapObjects = [];
+
+      function addBox(
+        x,
+        y,
+        z,
+        w,
+        h,
+        d,
+        color,
+        collidable = false,
+        roof = false,
+      ) {
+        const mesh = new THREE.Mesh(
+          new THREE.BoxGeometry(w, h, d),
+          new THREE.MeshStandardMaterial({ color, roughness: 0.85 }),
+        );
+        mesh.position.set(x, y + h / 2, z);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        scene.add(mesh);
+        mapObjects.push(mesh);
+        if (collidable) obstacles.push({ mesh, width: w, depth: d, height: h });
+        if (roof) {
+          const r = new THREE.Mesh(
+            new THREE.ConeGeometry(
+              Math.max(w, d) * 0.72,
+              Math.max(3, Math.min(w, d) * 0.45),
+              4,
+            ),
+            new THREE.MeshStandardMaterial({ color: 0x7a3f32, roughness: 0.9 }),
+          );
+          r.position.set(x, y + h + Math.max(1.5, Math.min(w, d) * 0.22), z);
+          r.rotation.y = Math.PI / 4;
+          r.castShadow = true;
+          scene.add(r);
+        }
+        return mesh;
+      }
+
+      function createHouse(x, z, scale = 1) {
+        const w = 10 * scale,
+          d = 9 * scale,
+          h = 5.5 * scale;
+        const colors = [0xd7c2a4, 0xbfcbd1, 0xe0d6c2, 0xc8b09a, 0xb9c9a8];
+        addBox(
+          x,
+          0,
+          z,
+          w,
+          h,
+          d,
+          colors[Math.floor(Math.random() * colors.length)],
+          true,
+          true,
+        );
+        addBox(
+          x,
+          1.5 * scale,
+          z - d / 2 - 0.18,
+          w * 0.42,
+          2.7 * scale,
+          0.35 * scale,
+          0x7b4d35,
+          false,
+        );
+        addBox(
+          x + w * 0.22,
+          1.7 * scale,
+          z - d / 2 - 0.2,
+          w * 0.16,
+          1.4 * scale,
+          0.2 * scale,
+          0x9ec7d8,
+          false,
+        );
+        addBox(
+          x - w * 0.22,
+          1.7 * scale,
+          z - d / 2 - 0.2,
+          w * 0.16,
+          1.4 * scale,
+          0.2 * scale,
+          0x9ec7d8,
+          false,
+        );
+      }
+
+      function createTree(x, z, scale = 1) {
+        const trunk = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.35 * scale, 0.5 * scale, 3 * scale, 8),
+          new THREE.MeshStandardMaterial({ color: 0x6b4329 }),
+        );
+        trunk.position.set(x, 1.5 * scale, z);
+        trunk.castShadow = true;
+        scene.add(trunk);
+        const crown = new THREE.Mesh(
+          new THREE.SphereGeometry(2.1 * scale, 10, 8),
+          new THREE.MeshStandardMaterial({ color: 0x3f7f42, roughness: 1 }),
+        );
+        crown.position.set(x, 4.2 * scale, z);
+        crown.castShadow = true;
+        scene.add(crown);
+      }
+
+      function createRoad(x, z, w, d) {
+        const road = new THREE.Mesh(
+          new THREE.BoxGeometry(w, 0.08, d),
+          new THREE.MeshStandardMaterial({ color: 0x303236, roughness: 1 }),
+        );
+        road.position.set(x, 0.04, z);
+        road.receiveShadow = true;
+        scene.add(road);
+        const dashMat = new THREE.MeshStandardMaterial({ color: 0xe8d36a });
+        if (w > d) {
+          for (let px = x - w / 2 + 8; px < x + w / 2; px += 16) {
+            const dash = new THREE.Mesh(
+              new THREE.BoxGeometry(7, 0.1, 0.22),
+              dashMat,
+            );
+            dash.position.set(px, 0.1, z);
+            scene.add(dash);
+          }
+        } else {
+          for (let pz = z - d / 2 + 8; pz < z + d / 2; pz += 16) {
+            const dash = new THREE.Mesh(
+              new THREE.BoxGeometry(0.22, 0.1, 7),
+              dashMat,
+            );
+            dash.position.set(x, 0.1, pz);
+            scene.add(dash);
+          }
+        }
+      }
+
+      // Malha de ruas e quarteirões
+      createRoad(0, 0, 220, 14);
+      createRoad(0, -65, 220, 14);
+      createRoad(0, 65, 220, 14);
+      createRoad(-65, 0, 14, 220);
+      createRoad(65, 0, 14, 220);
+      createRoad(-20, -35, 110, 10);
+      createRoad(35, 35, 100, 10);
+
+      // Bairro residencial
+      [
+        [-88, -92],
+        [-65, -92],
+        [-42, -92],
+        [-88, -72],
+        [-65, -72],
+        [-42, -72],
+        [-88, 88],
+        [-65, 88],
+        [-42, 88],
+        [-88, 108],
+        [-65, 108],
+        [-42, 108],
+      ].forEach(([x, z]) => createHouse(x, z, 0.9));
+      [
+        [88, -90],
+        [65, -90],
+        [42, -90],
+        [88, 88],
+        [65, 88],
+        [42, 88],
+      ].forEach(([x, z]) => createHouse(x, z, 1.05));
+
+      // Prédios do centro
+      addBox(-30, -8, -18, 16, 24, 16, 0x9aabb5, true);
+      addBox(30, -8, -22, 18, 32, 18, 0xb6a28e, true);
+      addBox(-25, 0, 25, 22, 18, 16, 0x8299a5, true);
+      addBox(30, 0, 28, 14, 42, 14, 0xc5c1b7, true);
+
+      // Praça central com estátua
+      const plaza = new THREE.Mesh(
+        new THREE.BoxGeometry(42, 0.16, 34),
+        new THREE.MeshStandardMaterial({ color: 0xb7ad99, roughness: 1 }),
+      );
+      plaza.position.set(0, 0.08, 0);
+      plaza.receiveShadow = true;
+      scene.add(plaza);
+      const fountain = new THREE.Mesh(
+        new THREE.CylinderGeometry(5, 5.5, 0.6, 32),
+        new THREE.MeshStandardMaterial({ color: 0x777b80, roughness: 0.65 }),
+      );
+      fountain.position.set(0, 0.3, 0);
+      fountain.castShadow = true;
+      scene.add(fountain);
+      const statueBase = addBox(0, 0.6, 0, 1.8, 2.2, 1.8, 0x777777, false);
+      const statueBody = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.65, 2.2, 6, 10),
+        new THREE.MeshStandardMaterial({ color: 0x8b8b86, roughness: 0.7 }),
+      );
+      statueBody.position.set(0, 3.0, 0);
+      statueBody.castShadow = true;
+      scene.add(statueBody);
+      for (const [x, z] of [
+        [-15, -11],
+        [15, -11],
+        [-15, 11],
+        [15, 11],
+      ])
+        createTree(x, z, 1.1);
+
+      // Igreja como ponto de referência
+      addBox(-82, 0, 10, 24, 10, 18, 0xe5dfc9, true);
+      const tower = addBox(-82, 0, 0, 7, 23, 7, 0xd5cfba, true);
+      const spire = new THREE.Mesh(
+        new THREE.ConeGeometry(5.2, 9, 4),
+        new THREE.MeshStandardMaterial({ color: 0x6b4b3c, roughness: 0.9 }),
+      );
+      spire.position.set(-82, 27.5, 0);
+      spire.rotation.y = Math.PI / 4;
+      spire.castShadow = true;
+      scene.add(spire);
+
+      // Caixa d'água
+      const tank = new THREE.Mesh(
+        new THREE.CylinderGeometry(5, 5, 7, 24),
+        new THREE.MeshStandardMaterial({ color: 0xcfd5d8, roughness: 0.65 }),
+      );
+      tank.position.set(88, 25, 15);
+      tank.castShadow = true;
+      scene.add(tank);
+      const legs = new THREE.Group();
+      for (const [dx, dz] of [
+        [-3, -3],
+        [3, -3],
+        [-3, 3],
+        [3, 3],
+      ]) {
+        const leg = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.45, 0.55, 28, 8),
+          new THREE.MeshStandardMaterial({ color: 0x73777a }),
+        );
+        leg.position.set(88 + dx, 14, 15 + dz);
+        leg.castShadow = true;
+        scene.add(leg);
+      }
+
+      // Parque arborizado
+      for (let i = 0; i < 28; i++) {
+        const x = 115 + (Math.random() - 0.5) * 55,
+          z = 25 + (Math.random() - 0.5) * 55;
+        createTree(x, z, 0.8 + Math.random() * 0.55);
+      }
+
+      // Postes simples
+      function createLamp(x, z) {
+        const pole = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.12, 0.18, 5, 8),
+          new THREE.MeshStandardMaterial({ color: 0x42464a }),
+        );
+        pole.position.set(x, 2.5, z);
+        pole.castShadow = true;
+        scene.add(pole);
+        const lamp = new THREE.Mesh(
+          new THREE.SphereGeometry(0.3, 8, 8),
+          new THREE.MeshStandardMaterial({
+            color: 0xffffcc,
+            emissive: 0x332200,
+            emissiveIntensity: 1,
+          }),
+        );
+        lamp.position.set(x, 5.15, z);
+        scene.add(lamp);
+      }
+      for (let x = -100; x <= 100; x += 20) {
+        createLamp(x, -8);
+        createLamp(x, 8);
+      }
+      for (let z = -100; z <= 100; z += 20) {
+        createLamp(-8, z);
+        createLamp(8, z);
+      }
+
+      /* =========================================================
+   ÁUDIO - THREE.Audio
+   O gimbal NÃO participa do cálculo do som.
+========================================================= */
+
+const listener = new THREE.AudioListener();
+camera.add(listener);
+
+const droneSound = new THREE.Audio(listener);
+const audioLoader = new THREE.AudioLoader();
+
+let audioLoaded = false;
+let audioStarted = false;
+
+// Carrega o som externo
+audioLoader.load(
+  "audio/drone-motor.mp3",
+
+  function (buffer) {
+    droneSound.setBuffer(buffer);
+    droneSound.setLoop(true);
+    droneSound.setVolume(0.35);
+
+    audioLoaded = true;
+
+    console.log("🔊 Áudio do drone carregado.");
+
+    // Se o usuário já clicou, inicia agora
+    if (
+      audioStarted &&
+      !droneSound.isPlaying
+    ) {
+      droneSound.play();
+    }
+  },
+
+  undefined,
+
+  function (error) {
+    console.error(
+      "❌ Erro ao carregar o som do drone:",
+      error
+    );
+
+    const status =
+      document.getElementById("audioStatus");
+
+    if (status) {
+      status.textContent = "🔇 Erro no áudio";
+    }
+  }
+);
+
+
+/* =========================================================
+   ATIVAÇÃO DO ÁUDIO
+========================================================= */
+
+function activateAudio() {
+
+  audioStarted = true;
+
+  // Libera o AudioContext do navegador
+  if (listener.context.state === "suspended") {
+    listener.context.resume();
+  }
+
+  // Se o arquivo já carregou, toca
+  if (
+    audioLoaded &&
+    !droneSound.isPlaying
+  ) {
+    droneSound.play();
+  }
+
+  const status =
+    document.getElementById("audioStatus");
+
+  if (status) {
+
+    if (audioLoaded) {
+      status.textContent = "🔊 Som: ativo";
+    } else {
+      status.textContent = "🔊 Carregando som...";
+    }
+
+  }
+}
+
+
+/*
+  NÃO usamos { once: true }.
+  Assim, se o primeiro clique acontecer antes
+  do MP3 carregar, outro clique ainda poderá
+  ativar o áudio.
+*/
+window.addEventListener(
+  "pointerdown",
+  activateAudio
+);
+
+window.addEventListener(
+  "keydown",
+  activateAudio
+);
+
+
+/* =========================================================
+   ATUALIZAÇÃO DO SOM
+   SOMENTE A DINÂMICA DO DRONE.
+   GIMBAL É COMPLETAMENTE IGNORADO.
+========================================================= */
+
+function updateDroneAudio(dt) {
+
+  if (
+    !audioLoaded ||
+    !droneSound.isPlaying
+  ) {
+    return;
+  }
+
+  // Velocidade horizontal
+  const horizontalSpeed = Math.hypot(
+    drone.velocity.x,
+    drone.velocity.z
+  );
+
+  // Velocidade vertical
+  const verticalSpeed =
+    Math.abs(drone.velocity.y);
+
+  /*
+    Movimento utilizado para o áudio.
+
+    IMPORTANTE:
+    Não usamos gimbalAngle.
+    Não usamos câmera.
+    Não usamos R2/L2.
+  */
+  const movementSpeed = Math.max(
+    horizontalSpeed,
+    verticalSpeed * 0.55
+  );
+
+  // Maior velocidade entre os modos
+  const maxSpeed = Math.max(
+    ...flightModes.map(
+      mode => mode.maxSpeed
+    )
+  );
+
+  const speedFactor =
+    THREE.MathUtils.clamp(
+      movementSpeed / maxSpeed,
+      0,
+      1
+    );
+
+  /*
+    CINE   = 0.85
+    NORMAL = 1.00
+    SPORT  = 1.15
+  */
+  const modeFactor = [
+    1.00,
+    1.00,
+    1.00
+  ][input.mode];
+
+  /*
+    Velocidade do áudio:
+
+    parado       ≈ 1.0x
+    velocidade  máxima ≈ 1.9x
+
+    O modo de voo altera
+    levemente essa resposta.
+  */
+  const targetPlaybackRate =
+    (1.0 + speedFactor * 0.90)
+    * modeFactor;
+
+  const currentRate =
+    droneSound.getPlaybackRate();
+
+  const smoothRate =
+    THREE.MathUtils.lerp(
+      currentRate,
+      targetPlaybackRate,
+      Math.min(dt * 8, 1)
+    );
+
+  droneSound.setPlaybackRate(
+    smoothRate
+  );
+
+
+  // Volume baseado somente no movimento
+  const targetVolume =
+    0.28 +
+    speedFactor * 0.20 +
+    verticalSpeed * 0.015;
+
+  const volume =
+    THREE.MathUtils.clamp(
+      targetVolume,
+      0.20,
+      0.50
+    );
+
+  droneSound.setVolume(volume);
+}
+
+      /* =========================================================
+   DRONE
+========================================================= */
+
+      const drone = {
+        position: new THREE.Vector3(0, 0.3, 30),
+
+        velocity: new THREE.Vector3(),
+
+        yaw: 0,
+
+        /* Os valores de voo agora são definidos pelo modo. */
+        maxSpeedNormal: 8,
+        maxSpeedSport: 14,
+        acceleration: 4,
+        verticalSpeed: 4,
+        yawSpeed: THREE.MathUtils.degToRad(80),
+
+        /* Ângulo atual do gimbal da câmera. */
+        gimbalAngle: 0,
+
+        friction: 3.5,
+
+        heightMin: 0.15,
+
+        heightMax: 120,
+      };
+
+      /* =========================================================
+   INPUT
+========================================================= */
+
+      const input = {
+        throttle: 0,
+
+        yaw: 0,
+
+        pitch: 0,
+
+        roll: 0,
+
+        gimbalUp: 0,
+        gimbalDown: 0,
+
+        /* CINE -> NORMAL -> SPORT */
+        mode: 0,
+      };
+
+      const flightModes = [
+        {
+          name: "CINE",
+          maxSpeed: 5.5,
+          acceleration: 3.5,
+          verticalSpeed: 3.5,
+          yawSpeed: 55,
+          gimbalSpeed: 25,
+        },
+        {
+          name: "NORMAL",
+          maxSpeed: 8.5,
+          acceleration: 5,
+          verticalSpeed: 5,
+          yawSpeed: 80,
+          gimbalSpeed: 35,
+        },
+        {
+          name: "SPORT",
+          maxSpeed: 12,
+          acceleration: 8,
+          verticalSpeed: 6.5,
+          yawSpeed: 110,
+          gimbalSpeed: 50,
+        },
+      ];
+
+      /* =========================================================
+   CONFIGURAÇÃO DO GAMEPAD
+========================================================= */
+
+      const controller = {
+        gamepad: null,
+
+        index: null,
+
+        deadzone: 0.15,
+
+        smooth: 0.18,
+
+        center: [0, 0, 0, 0],
+
+        customMapping: {
+          yaw: 0,
+
+          throttle: 1,
+
+          roll: 2,
+
+          pitch: 3,
+        },
+
+        invert: {
+          yaw: false,
+
+          throttle: true,
+
+          roll: false,
+
+          pitch: false,
+        },
+      };
+
+      /* Estado dos botões para detectar apenas o clique de L1/R1. */
+      let previousL1 = false;
+      let previousR1 = false;
+
+      /* Limites realistas do gimbal do Mini 3. */
+      const GIMBAL_MIN = -90;
+      const GIMBAL_MAX = 20;
+
+      function setFlightMode(modeIndex) {
+        input.mode = THREE.MathUtils.clamp(
+          modeIndex,
+          0,
+          flightModes.length - 1,
+        );
+      }
+
+      function changeFlightMode(direction) {
+        const nextMode =
+          (input.mode + direction + flightModes.length) % flightModes.length;
+
+        setFlightMode(nextMode);
+      }
+
+      /* =========================================================
+   FUNÇÃO DE DEADZONE
+========================================================= */
+
+      function applyDeadzone(value, deadzone) {
+        if (Math.abs(value) <= deadzone) {
+          return 0;
+        }
+
+        const sign = Math.sign(value);
+
+        const normalized = (Math.abs(value) - deadzone) / (1 - deadzone);
+
+        return sign * Math.min(normalized, 1);
+      }
+
+      /* =========================================================
+   LIMITAR VALORES
+========================================================= */
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      /* =========================================================
+   DETECTAR CONTROLE
+========================================================= */
+
+      window.addEventListener("gamepadconnected", (event) => {
+        connectGamepad(event.gamepad);
+      });
+
+      window.addEventListener("gamepaddisconnected", (event) => {
+        if (controller.index === event.gamepad.index) {
+          controller.gamepad = null;
+
+          controller.index = null;
+
+          document.getElementById("gamepadStatus").textContent = "desconectado";
+        }
+      });
+
+      function connectGamepad(gp) {
+        controller.gamepad = gp;
+
+        controller.index = gp.index;
+
+        document.getElementById("gamepadStatus").textContent = "conectado";
+
+        document.getElementById("controllerPanel").style.display = "block";
+
+        document.getElementById("controllerName").textContent = gp.id;
+
+        centerSticks();
+      }
+
+      /* =========================================================
+   BUSCAR GAMEPAD NOVAMENTE
+========================================================= */
+
+      function findGamepad() {
+        const pads = navigator.getGamepads();
+
+        if (controller.index !== null) {
+          const current = pads[controller.index];
+
+          if (current) {
+            controller.gamepad = current;
+
+            return current;
+          }
+        }
+
+        for (const gp of pads) {
+          if (gp) {
+            connectGamepad(gp);
+
+            return gp;
+          }
+        }
+
+        return null;
+      }
+
+      /* =========================================================
+   LER EIXOS
+========================================================= */
+
+      function getAxis(gp, index) {
+        if (!gp || gp.axes.length <= index) {
+          return 0;
+        }
+
+        let value = gp.axes[index];
+
+        if (!Number.isFinite(value)) {
+          value = 0;
+        }
+
+        value -= controller.center[index] || 0;
+
+        value = clamp(value, -1, 1);
+
+        value = applyDeadzone(value, controller.deadzone);
+
+        return value;
+      }
+
+      /* =========================================================
+   LER GAMEPAD
+========================================================= */
+
+      function readGamepad() {
+        const gp = findGamepad();
+
+        if (!gp) {
+          input.throttle = 0;
+          input.yaw = 0;
+          input.pitch = 0;
+          input.roll = 0;
+          input.gimbalUp = 0;
+          input.gimbalDown = 0;
+
+          return;
+        }
+
+        /*
+       IMPORTANTE:
+
+       Sempre buscamos novamente o
+       Gamepad pelo índice.
+
+       Isso evita trabalhar com
+       um objeto antigo.
+    */
+
+        const yaw = getAxis(gp, controller.customMapping.yaw);
+
+        const throttle = getAxis(gp, controller.customMapping.throttle);
+
+        const roll = getAxis(gp, controller.customMapping.roll);
+
+        const pitch = getAxis(gp, controller.customMapping.pitch);
+
+        input.yaw = controller.invert.yaw ? -yaw : yaw;
+
+        input.throttle = controller.invert.throttle ? -throttle : throttle;
+
+        input.roll = controller.invert.roll ? -roll : roll;
+
+        input.pitch = controller.invert.pitch ? -pitch : pitch;
+
+        /*
+       MODOS DE VOO
+
+       PS4 / Standard Gamepad:
+       botão 4 = L1
+       botão 5 = R1
+
+       L1 volta:
+       CINE <- NORMAL <- SPORT
+
+       R1 avança:
+       CINE -> NORMAL -> SPORT
+    */
+
+        const l1Pressed = gp.buttons.length > 4 && gp.buttons[4].pressed;
+
+        const r1Pressed = gp.buttons.length > 5 && gp.buttons[5].pressed;
+
+        if (r1Pressed && !previousR1) {
+          changeFlightMode(1);
+        }
+
+        if (l1Pressed && !previousL1) {
+          changeFlightMode(-1);
+        }
+
+        previousL1 = l1Pressed;
+        previousR1 = r1Pressed;
+
+        /*
+       GIMBAL
+
+       botão 6 = L2 -> câmera para baixo
+       botão 7 = R2 -> câmera para cima
+
+       Como são gatilhos analógicos, usamos o valor
+       proporcionalmente à intensidade do aperto.
+    */
+
+        const l2Value = gp.buttons.length > 6 ? gp.buttons[6].value : 0;
+
+        const r2Value = gp.buttons.length > 7 ? gp.buttons[7].value : 0;
+
+        input.gimbalUp = r2Value;
+        input.gimbalDown = l2Value;
+
+        /*
+       OPTIONS
+
+       botão 9
+    */
+
+        if (gp.buttons.length > 9 && gp.buttons[9].pressed) {
+          resetDrone();
+        }
+
+        updateAxisDisplay(gp);
+      }
+
+      /* =========================================================
+   MOSTRAR EIXOS
+========================================================= */
+
+      function updateAxisDisplay(gp) {
+        for (let i = 0; i < 4; i++) {
+          const value = gp.axes[i] || 0;
+
+          const text = document.getElementById(`a${i}Text`);
+
+          const bar = document.getElementById(`a${i}`);
+
+          if (text) {
+            text.textContent = value.toFixed(3);
+          }
+
+          if (bar) {
+            bar.style.transform = `translateX(${value * 50}%)`;
+          }
+        }
+      }
+
+      /* =========================================================
+   RECENTRALIZAR
+========================================================= */
+
+      function centerSticks() {
+        const gp = findGamepad();
+
+        if (!gp) return;
+
+        for (let i = 0; i < 4; i++) {
+          controller.center[i] = gp.axes[i] || 0;
+        }
+
+        console.log("Sticks recentralizados:", controller.center);
+      }
+
+      document
+        .getElementById("centerButton")
+        .addEventListener("click", centerSticks);
+
+      /* =========================================================
+   TECLADO
+========================================================= */
+
+      const keys = {};
+
+      window.addEventListener("keydown", (event) => {
+        keys[event.code] = true;
+
+        if (event.code === "KeyR") {
+          resetDrone();
+        }
+      });
+
+      window.addEventListener("keyup", (event) => {
+        keys[event.code] = false;
+      });
+
+      function readKeyboard() {
+        if (controller.gamepad) return;
+
+        let throttle = 0;
+        let yaw = 0;
+        let pitch = 0;
+        let roll = 0;
+
+        if (keys.KeyW) throttle += 1;
+
+        if (keys.KeyS) throttle -= 1;
+
+        if (keys.KeyA) yaw -= 1;
+
+        if (keys.KeyD) yaw += 1;
+
+        if (keys.ArrowUp) pitch += 1;
+
+        if (keys.ArrowDown) pitch -= 1;
+
+        if (keys.ArrowLeft) roll -= 1;
+
+        if (keys.ArrowRight) roll += 1;
+
+        input.throttle = throttle;
+
+        input.yaw = yaw;
+
+        input.pitch = pitch;
+
+        input.roll = roll;
+        input.gimbalUp = 0;
+        input.gimbalDown = 0;
+      }
+
+      /* =========================================================
+   COLISÃO
+========================================================= */
+
+      function checkCollision(position) {
+        const radius = 0.5;
+
+        for (const obstacle of obstacles) {
+          const box = obstacle.mesh;
+
+          const minX = box.position.x - obstacle.width / 2 - radius;
+
+          const maxX = box.position.x + obstacle.width / 2 + radius;
+
+          const minY = 0;
+
+          const maxY = obstacle.height + radius;
+
+          const minZ = box.position.z - obstacle.depth / 2 - radius;
+
+          const maxZ = box.position.z + obstacle.depth / 2 + radius;
+
+          if (
+            position.x > minX &&
+            position.x < maxX &&
+            position.y > minY &&
+            position.y < maxY &&
+            position.z > minZ &&
+            position.z < maxZ
+          ) {
+            return true;
+          }
+        }
+
+        return false;
+      }
+
+      /* =========================================================
+   FÍSICA
+========================================================= */
+
+      function updateDrone(dt) {
+        const mode = flightModes[input.mode];
+
+        const maxSpeed = mode.maxSpeed;
+
+        /* =============================
+       YAW
+    ============================= */
+
+        drone.yaw -= input.yaw * THREE.MathUtils.degToRad(mode.yawSpeed) * dt;
+
+        /* =============================
+       DIREÇÕES
+    ============================= */
+
+        const forward = new THREE.Vector3(
+          Math.sin(drone.yaw),
+          0,
+          Math.cos(drone.yaw),
+        );
+
+        const right = new THREE.Vector3(
+          Math.cos(drone.yaw),
+          0,
+          -Math.sin(drone.yaw),
+        );
+
+        /* =============================
+       VELOCIDADE DESEJADA
+    ============================= */
+
+        const desired = new THREE.Vector3();
+
+        desired.addScaledVector(forward, input.pitch * maxSpeed);
+
+        desired.addScaledVector(right, input.roll * maxSpeed);
+
+        /* =============================
+       ACELERAÇÃO
+    ============================= */
+
+        drone.velocity.x = THREE.MathUtils.damp(
+          drone.velocity.x,
+          desired.x,
+          mode.acceleration,
+          dt,
+        );
+
+        drone.velocity.z = THREE.MathUtils.damp(
+          drone.velocity.z,
+          desired.z,
+          mode.acceleration,
+          dt,
+        );
+
+        /* =============================
+       FREIO
+    ============================= */
+
+        if (Math.abs(input.pitch) < 0.01 && Math.abs(input.roll) < 0.01) {
+          drone.velocity.x = THREE.MathUtils.damp(
+            drone.velocity.x,
+            0,
+            drone.friction,
+            dt,
+          );
+
+          drone.velocity.z = THREE.MathUtils.damp(
+            drone.velocity.z,
+            0,
+            drone.friction,
+            dt,
+          );
+        }
+
+        /* =============================
+       ALTURA
+    ============================= */
+
+        /* =========================================================
+   ALTURA / HOVER
+========================================================= */
+
+        const verticalInput = input.throttle;
+
+        /*
+    Stick para cima  -> sobe
+    Stick para baixo -> desce
+    Stick no centro  -> mantém altitude
+*/
+
+        if (Math.abs(verticalInput) < 0.05) {
+          // Hover: não deixa o drone cair
+          drone.velocity.y = THREE.MathUtils.damp(drone.velocity.y, 0, 10, dt);
+        } else {
+          const targetVerticalSpeed = verticalInput * mode.verticalSpeed;
+
+          drone.velocity.y = THREE.MathUtils.damp(
+            drone.velocity.y,
+            targetVerticalSpeed,
+            mode.acceleration + 4,
+            dt,
+          );
+        }
+
+        /* =============================
+       POSIÇÃO ANTIGA
+    ============================= */
+
+        const oldPosition = drone.position.clone();
+
+        /* =============================
+       MOVER
+    ============================= */
+
+        drone.position.addScaledVector(drone.velocity, dt);
+
+        /* =============================
+       CHÃO
+    ============================= */
+
+        if (drone.position.y < drone.heightMin) {
+          drone.position.y = drone.heightMin;
+
+          drone.velocity.y = 0;
+        }
+
+        /* =============================
+       TETO
+    ============================= */
+
+        if (drone.position.y > drone.heightMax) {
+          drone.position.y = drone.heightMax;
+
+          drone.velocity.y = 0;
+        }
+
+        /* =============================
+       COLISÃO
+    ============================= */
+
+        if (checkCollision(drone.position)) {
+          drone.position.copy(oldPosition);
+
+          drone.velocity.multiplyScalar(0.1);
+        }
+      }
+
+      /* =========================================================
+   GIMBAL
+========================================================= */
+
+      function updateGimbal(dt) {
+        const mode = flightModes[input.mode];
+
+        const gimbalInput = input.gimbalUp - input.gimbalDown;
+
+        if (Math.abs(gimbalInput) > 0.01) {
+          drone.gimbalAngle += gimbalInput * mode.gimbalSpeed * dt;
+
+          drone.gimbalAngle = THREE.MathUtils.clamp(
+            drone.gimbalAngle,
+            GIMBAL_MIN,
+            GIMBAL_MAX,
+          );
+        }
+      }
+
+      /* =========================================================
+   CÂMERA
+========================================================= */
+
+      function updateCamera() {
+        camera.position.copy(drone.position);
+
+        camera.rotation.order = "YXZ";
+
+        camera.rotation.y = drone.yaw;
+
+        /* Gimbal: R2 sobe e L2 desce a câmera. */
+        camera.rotation.x = THREE.MathUtils.degToRad(drone.gimbalAngle);
+
+        camera.rotation.z = 0;
+      }
+
+      /* =========================================================
+   RESET
+========================================================= */
+
+      function resetDrone() {
+        drone.position.set(0, 0.3, 30);
+
+        drone.velocity.set(0, 0, 0);
+
+        drone.yaw = 0;
+        drone.gimbalAngle = 0;
+        setFlightMode(0);
+      }
+
+      /* =========================================================
+   HUD
+========================================================= */
+
+      function updateHUD() {
+        const horizontalSpeed = Math.sqrt(
+          drone.velocity.x * drone.velocity.x +
+            drone.velocity.z * drone.velocity.z,
+        );
+
+        document.getElementById("altitude").textContent =
+          drone.position.y.toFixed(2);
+
+        document.getElementById("speed").textContent =
+          horizontalSpeed.toFixed(2);
+
+        let degrees = THREE.MathUtils.radToDeg(drone.yaw);
+
+        degrees = degrees % 360;
+
+        if (degrees < 0) {
+          degrees += 360;
+        }
+
+        document.getElementById("yaw").textContent = degrees.toFixed(0);
+
+        document.getElementById("mode").textContent =
+          flightModes[input.mode].name;
+
+        document.getElementById("gimbalAngle").textContent =
+          drone.gimbalAngle.toFixed(0);
+      }
+
+      /* =========================================================
+   CALIBRAÇÃO
+========================================================= */
+
+      let calibrationRunning = false;
+
+      document
+        .getElementById("calibrateButton")
+        .addEventListener("click", startCalibration);
+
+      document
+        .getElementById("calibrationCancel")
+        .addEventListener("click", stopCalibration);
+
+      async function startCalibration() {
+        const gp = findGamepad();
+
+        if (!gp) {
+          alert("Conecte um controle primeiro.");
+
+          return;
+        }
+
+        calibrationRunning = true;
+
+        document.getElementById("calibration").style.display = "flex";
+
+        /*
+       Primeiro vamos apenas
+       centralizar os sticks.
+
+       Depois podemos fazer uma
+       calibração completa.
+    */
+
+        document.getElementById("calibrationText").innerHTML =
+          "Solte os dois analógicos e aguarde...";
+
+        await wait(1000);
+
+        centerSticks();
+
+        document.getElementById("calibrationText").innerHTML =
+          "Controle centralizado!<br><br>" +
+          "A configuração automática " +
+          "será usada nesta versão.";
+
+        await wait(1500);
+
+        stopCalibration();
+      }
+
+      function stopCalibration() {
+        calibrationRunning = false;
+
+        document.getElementById("calibration").style.display = "none";
+      }
+
+      function wait(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+      }
+
+      /* =========================================================
+   RESIZE
+========================================================= */
+
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+
+        camera.updateProjectionMatrix();
+
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      /* =========================================================
+   LOOP
+========================================================= */
+
+      let lastTime = performance.now();
+
+      function animate() {
+        requestAnimationFrame(animate);
+
+        const now = performance.now();
+
+        let dt = (now - lastTime) / 1000;
+
+        lastTime = now;
+
+        dt = Math.min(dt, 0.05);
+
+        /*
+       IMPORTANTE:
+
+       Gamepad é lido ANTES
+       da física.
+    */
+
+        readGamepad();
+
+        readKeyboard();
+
+        updateDrone(dt);
+
+        updateGimbal(dt);
+        updateDroneAudio(dt);
+
+        updateCamera();
+
+        updateHUD();
+
+        renderer.render(scene, camera);
+      }
+
+      /* =========================================================
+   INICIAR
+========================================================= */
+
+      resetDrone();
+
+      animate();
+    </script>
+  </body>
+</html>
