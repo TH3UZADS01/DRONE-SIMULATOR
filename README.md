@@ -122,8 +122,6 @@ O objetivo do ambiente é proporcionar referências visuais e obstáculos para t
 
 # 🔊 Sistema de Áudio
 
-O sistema de áudio utiliza o Web Audio através da integração com o Three.js.
-
 O som do drone responde à dinâmica do voo, incluindo:
 
 - velocidade horizontal;
